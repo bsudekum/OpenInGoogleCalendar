@@ -23,20 +23,47 @@ function extractDateTime(text) {
   }
   return { start: null, end: null };
 }
-function openGoogleCalendar(dateText) {
+
+// --- EXTRA CONTEXT HELPERS ---
+function getMetaDescription() {
+  const meta = document.querySelector('meta[name="description"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+function getSurroundingText(span) {
+  const parent = span.parentNode;
+  if (!parent) return '';
+  return parent.textContent.trim().slice(0, 300);
+}
+
+// --- OPEN GOOGLE CALENDAR ---
+function openGoogleCalendar(dateText, contextSpan = null) {
   const { start, end } = extractDateTime(dateText);
   let dates = "";
   if (start && end) {
     dates = `${formatForGoogleCalendar(start)}/${formatForGoogleCalendar(end)}`;
   }
-  let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  let url = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(dateText)}`;
+
+  const pageTitle = document.title || '';
+  const pageURL = window.location.href;
+  const metaDescription = getMetaDescription();
+  const surroundingText = contextSpan ? getSurroundingText(contextSpan) : '';
+
+  const eventTitle = `${pageTitle}`;
+  const eventDetails = [
+    metaDescription,
+    surroundingText && `Link: ${pageURL}`
+  ].filter(Boolean).join('\n\n');
+
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  let url = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(eventTitle)}`;
   if (dates) url += `&dates=${dates}`;
+  url += `&details=${encodeURIComponent(eventDetails)}`;
   url += `&ctz=${encodeURIComponent(timezone)}`;
+
   window.open(url, '_blank');
 }
 
-// --- HANDLE UNDERLINED DATE SELECTION (CLICK, ENTER, SPACE, TOUCH) ---
+// --- HANDLE UNDERLINED DATE SELECTION ---
 function handleDateActivate(e) {
   const target = e.target;
   if (
@@ -48,7 +75,7 @@ function handleDateActivate(e) {
       (e.type === 'touchstart')
     )
   ) {
-    openGoogleCalendar(target.textContent);
+    openGoogleCalendar(target.textContent, target);
     e.preventDefault();
     e.stopPropagation();
   }
@@ -59,7 +86,7 @@ document.body.addEventListener('touchstart', handleDateActivate, true);
 
 // --- MAKE UNDERLINED DATES FOCUSABLE FOR A11Y ---
 function makeSpanFocusable(span) {
-  span.tabIndex = 0; // allow keyboard focus
+  span.tabIndex = 0;
   span.setAttribute('role', 'button');
   span.setAttribute('aria-label', 'Open this date in Google Calendar');
 }
